@@ -1,0 +1,23 @@
+{
+  "name": "gitsocial",
+  "version": "1.0.0",
+  "description": "iOS dark-themed social media platform using Catbox.moe for media storage",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "dev": "node server.js",
+    "dev:cf": "npx wrangler pages dev public/ --kv POSTS_KV --port 3000",
+    "deploy:cf": "npx wrangler pages deploy public/",
+    "deploy:vercel": "vercel deploy"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "multer": "^1.4.5-lts.1"
+  },
+  "devDependencies": {
+    "wrangler": "^3.0.0"
+  },
+  "keywords": ["social-media", "catbox", "cloudflare-workers", "vercel", "ios-theme"],
+  "author": "nonxe",
+  "license": "MIT"
+}
