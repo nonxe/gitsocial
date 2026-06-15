@@ -7,9 +7,11 @@
   "scripts": {
     "dev": "node server.js",
     "dev:cf": "npx wrangler pages dev public/ --d1 DB --persist-to .wrangler/state --port 3000",
-    "db:setup:local": "npx wrangler d1 execute DB --local --file=schema.sql",
+    "dev:worker": "npx wrangler dev --port 3000",
+    "db:setup:local": "npx wrangler d1 execute gitsocial_db --local --file=schema.sql",
     "db:setup:remote": "npx wrangler d1 execute gitsocial_db --remote --file=schema.sql",
     "deploy:cf": "npx wrangler pages deploy public/",
+    "deploy:worker": "npx wrangler deploy",
     "deploy:vercel": "vercel deploy"
   },
   "dependencies": {
