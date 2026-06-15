@@ -88,19 +88,24 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
       return res.status(400).json({ error: 'No file provided' });
     }
 
-    // Upload to catbox.moe
-    const catboxForm = new FormData();
-    catboxForm.append('reqtype', 'fileupload');
-    catboxForm.append(
-      'fileToUpload',
-      new Blob([req.file.buffer], { type: req.file.mimetype }),
-      req.file.originalname
-    );
+    // Manually construct multipart/form-data to avoid Node.js native FormData serialization bugs
+    const boundary = '----WebKitFormBoundarygs' + Math.random().toString(36).substring(2);
+    const header1 = `--${boundary}\r\nContent-Disposition: form-data; name="reqtype"\r\n\r\nfileupload\r\n`;
+    const header2 = `--${boundary}\r\nContent-Disposition: form-data; name="fileToUpload"; filename="${req.file.originalname}"\r\nContent-Type: ${req.file.mimetype}\r\n\r\n`;
+    const footer = `\r\n--${boundary}--\r\n`;
+
+    const bodyBuffer = Buffer.concat([
+      Buffer.from(header1, 'utf-8'),
+      Buffer.from(header2, 'utf-8'),
+      req.file.buffer,
+      Buffer.from(footer, 'utf-8')
+    ]);
 
     const catboxResponse = await fetch(CATBOX_API_URL, {
       method: 'POST',
-      body: catboxForm,
+      body: bodyBuffer,
       headers: {
+        'Content-Type': `multipart/form-data; boundary=${boundary}`,
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
       },
     });
