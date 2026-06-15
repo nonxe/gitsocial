@@ -57,7 +57,11 @@ export default async function handler(req) {
     // --- Upload to catbox.moe ---
     const catboxForm = new FormData();
     catboxForm.append('reqtype', 'fileupload');
-    catboxForm.append('fileToUpload', file);
+    
+    // Convert the File to a standard Blob to avoid Edge runtime streaming issues
+    const arrayBuffer = await file.arrayBuffer();
+    const fileBlob = new Blob([arrayBuffer], { type: file.type });
+    catboxForm.append('fileToUpload', fileBlob, file.name || 'upload.bin');
 
     const catboxResponse = await fetch(CATBOX_API_URL, {
       method: 'POST',
