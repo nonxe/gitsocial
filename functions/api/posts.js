@@ -27,22 +27,14 @@ export async function onRequestGet(context) {
   const { env } = context;
 
   try {
-    // Fetch the ordered list of post IDs
-    const indexRaw = await env.POSTS_KV.get('posts_index');
-    const postIds = indexRaw ? JSON.parse(indexRaw) : [];
+    // Fetch posts from D1 SQL database
+    const { results } = await env.DB.prepare(
+      'SELECT * FROM posts ORDER BY timestamp DESC'
+    ).all();
 
-    // Fetch each post object in parallel
-    const posts = await Promise.all(
-      postIds.map(async (id) => {
-        const raw = await env.POSTS_KV.get(`post:${id}`);
-        return raw ? JSON.parse(raw) : null;
-      })
-    );
 
-    // Filter out any null entries (deleted / missing posts)
-    const validPosts = posts.filter(Boolean);
 
-    return new Response(JSON.stringify({ posts: validPosts }), {
+    return new Response(JSON.stringify({ posts: results || [] }), {
       status: 200,
       headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
     });

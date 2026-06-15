@@ -56,7 +56,11 @@ export async function onRequestPost(context) {
     // --- Upload to catbox.moe ---
     const catboxForm = new FormData();
     catboxForm.append('reqtype', 'fileupload');
-    catboxForm.append('fileToUpload', file);
+    
+    // Convert the File to a standard Blob to avoid Miniflare streaming issues
+    const arrayBuffer = await file.arrayBuffer();
+    const fileBlob = new Blob([arrayBuffer], { type: file.type });
+    catboxForm.append('fileToUpload', fileBlob, file.name || 'upload.bin');
 
     const catboxResponse = await fetch(CATBOX_API_URL, {
       method: 'POST',
@@ -87,14 +91,12 @@ export async function onRequestPost(context) {
       type,
     };
 
-    // --- Prepend to the posts index ---
-    const indexRaw = await env.POSTS_KV.get('posts_index');
-    const postIds = indexRaw ? JSON.parse(indexRaw) : [];
-    postIds.unshift(post.id);
-    await env.POSTS_KV.put('posts_index', JSON.stringify(postIds));
-
-    // --- Store the post ---
-    await env.POSTS_KV.put(`post:${post.id}`, JSON.stringify(post));
+    // --- Store the post in D1 database ---
+    await env.DB.prepare(
+      'INSERT INTO posts (id, imageUrl, caption, author, timestamp, likes, type) VALUES (?, ?, ?, ?, ?, ?, ?)'
+    )
+      .bind(post.id, post.imageUrl, post.caption, post.author, post.timestamp, post.likes, post.type)
+      .run();
 
     return new Response(JSON.stringify({ success: true, post }), {
       status: 201,

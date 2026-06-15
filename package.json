@@ -6,7 +6,9 @@
   "main": "server.js",
   "scripts": {
     "dev": "node server.js",
-    "dev:cf": "npx wrangler pages dev public/ --kv POSTS_KV --port 3000",
+    "dev:cf": "npx wrangler pages dev public/ --d1 DB --persist-to .wrangler/state --port 3000",
+    "db:setup:local": "npx wrangler d1 execute DB --local --file=schema.sql",
+    "db:setup:remote": "npx wrangler d1 execute gitsocial_db --remote --file=schema.sql",
     "deploy:cf": "npx wrangler pages deploy public/",
     "deploy:vercel": "vercel deploy"
   },

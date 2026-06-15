@@ -48,14 +48,19 @@ export async function onRequestPost(context) {
       );
     }
 
-    // --- Remove from the posts index ---
-    const indexRaw = await env.POSTS_KV.get('posts_index');
-    const postIds = indexRaw ? JSON.parse(indexRaw) : [];
-    const updatedIds = postIds.filter((pid) => pid !== id);
-    await env.POSTS_KV.put('posts_index', JSON.stringify(updatedIds));
+    // Delete the post from D1 DB
+    const deleteRes = await env.DB.prepare(
+      'DELETE FROM posts WHERE id = ?'
+    )
+      .bind(id)
+      .run();
 
-    // --- Delete the post object ---
-    await env.POSTS_KV.delete(`post:${id}`);
+    if (deleteRes.meta.changes === 0) {
+      return new Response(
+        JSON.stringify({ error: 'Post not found' }),
+        { status: 404, headers: { 'Content-Type': 'application/json', ...CORS_HEADERS } }
+      );
+    }
 
     return new Response(JSON.stringify({ success: true }), {
       status: 200,

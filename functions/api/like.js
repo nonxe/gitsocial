@@ -37,20 +37,26 @@ export async function onRequestPost(context) {
       );
     }
 
-    // Fetch the existing post
-    const raw = await env.POSTS_KV.get(`post:${id}`);
-    if (!raw) {
+    // Update the like count in D1
+    const updateRes = await env.DB.prepare(
+      'UPDATE posts SET likes = likes + 1 WHERE id = ?'
+    )
+      .bind(id)
+      .run();
+
+    if (updateRes.meta.changes === 0) {
       return new Response(
         JSON.stringify({ error: 'Post not found' }),
         { status: 404, headers: { 'Content-Type': 'application/json', ...CORS_HEADERS } }
       );
     }
 
-    const post = JSON.parse(raw);
-    post.likes += 1;
-
-    // Persist the updated post
-    await env.POSTS_KV.put(`post:${id}`, JSON.stringify(post));
+    // Fetch the updated likes count
+    const post = await env.DB.prepare(
+      'SELECT likes FROM posts WHERE id = ?'
+    )
+      .bind(id)
+      .first();
 
     return new Response(JSON.stringify({ success: true, likes: post.likes }), {
       status: 200,
