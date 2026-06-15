@@ -88,35 +88,62 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
       return res.status(400).json({ error: 'No file provided' });
     }
 
-    // Manually construct multipart/form-data to avoid Node.js native FormData serialization bugs
+    // 1. Manually construct multipart/form-data for tmpfiles.org upload
     const boundary = '----WebKitFormBoundarygs' + Math.random().toString(36).substring(2);
-    const header1 = `--${boundary}\r\nContent-Disposition: form-data; name="reqtype"\r\n\r\nfileupload\r\n`;
-    const header2 = `--${boundary}\r\nContent-Disposition: form-data; name="fileToUpload"; filename="${req.file.originalname}"\r\nContent-Type: ${req.file.mimetype}\r\n\r\n`;
+    const header = `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${req.file.originalname}"\r\nContent-Type: ${req.file.mimetype}\r\n\r\n`;
     const footer = `\r\n--${boundary}--\r\n`;
 
     const bodyBuffer = Buffer.concat([
-      Buffer.from(header1, 'utf-8'),
-      Buffer.from(header2, 'utf-8'),
+      Buffer.from(header, 'utf-8'),
       req.file.buffer,
       Buffer.from(footer, 'utf-8')
     ]);
 
-    const catboxResponse = await fetch(CATBOX_API_URL, {
+    // 2. Upload to tmpfiles.org
+    const tmpfilesResponse = await fetch('https://tmpfiles.org/api/v1/upload', {
       method: 'POST',
       body: bodyBuffer,
       headers: {
         'Content-Type': `multipart/form-data; boundary=${boundary}`,
+      },
+    });
+
+    if (!tmpfilesResponse.ok) {
+      const errText = await tmpfilesResponse.text();
+      console.error('[upload] tmpfiles.org error:', errText);
+      return res.status(502).json({ error: 'Transient upload failed' });
+    }
+
+    const tmpfilesData = await tmpfilesResponse.json();
+    const tmpfilesUrl = tmpfilesData.data.url;
+    
+    // 3. Convert to direct download link
+    const directDownloadUrl = tmpfilesUrl.replace('https://tmpfiles.org/', 'https://tmpfiles.org/dl/');
+
+    // 4. Request Catbox to rehost the file via urlupload (simple string form data)
+    const catboxForm = new FormData();
+    catboxForm.append('reqtype', 'urlupload');
+    catboxForm.append('url', directDownloadUrl);
+
+    const catboxResponse = await fetch(CATBOX_API_URL, {
+      method: 'POST',
+      body: catboxForm,
+      headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
       },
     });
 
     if (!catboxResponse.ok) {
       const errText = await catboxResponse.text();
-      console.error('[upload] Catbox error:', errText);
-      return res.status(502).json({ error: 'Catbox upload failed' });
+      console.error('[upload] Catbox rehost error:', errText);
+      return res.status(502).json({ error: 'Catbox rehost failed' });
     }
 
     const imageUrl = (await catboxResponse.text()).trim();
+    if (!imageUrl.startsWith('https://files.catbox.moe')) {
+      console.error('[upload] Catbox invalid response:', imageUrl);
+      return res.status(502).json({ error: 'Catbox upload failed: ' + imageUrl });
+    }
     const type = req.file.mimetype.startsWith('video/') ? 'video' : 'image';
 
     const post = {
